@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-pink-50">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DearChat - Only Us</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E💖%3C/text%3E%3C/svg%3E"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <style>
+    ::-webkit-scrollbar { display: none; }
+    .heart {
+      position: fixed;
+      width: 10px;
+      height: 10px;
+      background: red;
+      transform: rotate(45deg);
+      animation: fall 6s linear infinite;
+      opacity: 0.7;
+    }
+    .heart::before, .heart::after {
+      content: '';
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background: red;
+      border-radius: 50%;
+    }
+    .heart::before { top: -5px; left: 0; }
+    .heart::after { top: 0; left: -5px; }
+    @keyframes fall {
+      to {
+        transform: translateY(100vh) rotate(360deg);
+        opacity: 0;
+      }
+    }
+    
+    .typing-dot {
+        width: 8px;
+        height: 8px;
+        margin: 0 2px;
+        background-color: #f472b6;
+        border-radius: 50%;
+        opacity: 0.4;
+        animation: typing-dot 1.4s infinite both;
+      }
+      .typing-dot:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .typing-dot:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes typing-dot {
+        0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+        30% { transform: translateY(-5px); opacity: 1; }
+      }
+    
+    /* Voice recorder animation */
+    .pulse-ring {
+      content: '';
+      width: 40px;
+      height: 40px;
+      background: rgba(236, 72, 153, 0.5);
+      border-radius: 50%;
+      position: absolute;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.8); opacity: 1; }
+      70% { transform: scale(1.3); opacity: 0; }
+      100% { opacity: 0; }
+    }
+    
+    /* Waveform animation */
+    .waveform {
+      display: flex;
+      align-items: center;
+      height: 40px;
+    }
+    .waveform-bar {
+      width: 3px;
+      margin: 0 1px;
+      background: linear-gradient(to top, #ec4899, #f472b6);
+      border-radius: 3px;
+      animation: waveform 1.5s ease-in-out infinite;
+    }
+    .waveform-bar:nth-child(1) { height: 20%; animation-delay: 0.1s; }
+    .waveform-bar:nth-child(2) { height: 50%; animation-delay: 0.2s; }
+    .waveform-bar:nth-child(3) { height: 30%; animation-delay: 0.3s; }
+    .waveform-bar:nth-child(4) { height: 70%; animation-delay: 0.4s; }
+    .waveform-bar:nth-child(5) { height: 40%; animation-delay: 0.5s; }
+    .waveform-bar:nth-child(6) { height: 60%; animation-delay: 0.6s; }
+    .waveform-bar:nth-child(7) { height: 30%; animation-delay: 0.7s; }
+    .waveform-bar:nth-child(8) { height: 50%; animation-delay: 0.8s; }
+    @keyframes waveform {
+      0%, 100% { transform: scaleY(1); }
+      50% { transform: scaleY(1.5); }
+    }
+    
+    /* Delete animation */
+    @keyframes slide-out {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
+    .slide-out {
+      animation: slide-out 0.3s forwards;
+    }
+  </style>
+</head>
+<body class="flex items-center justify-center min-h-screen bg-gradient-to-br from-pink-100 to-pink-300 dark:from-gray-800 dark:to-gray-900 text-gray-800 dark:text-white relative">
+  
+
+  <!-- Falling Hearts -->
+  <div id="hearts" class="pointer-events-none absolute inset-0 z-0"></div>
+  
+
+
+  <!-- Alert Message -->
+  <div id="alertBox" class="hidden fixed top-5 left-1/2 transform -translate-x-1/2 bg-white/80 backdrop-blur-lg text-pink-800 font-bold px-6 py-3 rounded-xl shadow-xl z-50 border border-pink-300 transition-all duration-500">
+    ✅ Login Successful! Welcome to your love chat 💌
+  </div>
+
+  <!-- Notification Sound -->
+  <audio id="notifSound" src="assets/pop.mp3" preload="auto"></audio>
+
+  <!-- Unlock Screen -->
+  <div id="unlockScreen" class="flex flex-col items-center justify-center gap-4 z-10 p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
+    <h1 class="text-3xl font-bold">🔒 Enter Key</h1>
+    <input id="passcode" type="password" placeholder="Secret code..." class="px-4 py-2 rounded-lg border border-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-500 text-black">
+    <select id="userSelect" class="px-4 py-2 rounded-lg border border-pink-300 text-black">
+      <option value="K">K 💖</option>
+      <option value="D">D 💖</option>
+    </select>
+    <button onclick="unlockChat()" class="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-lg shadow">Unlock 💖</button>
+  </div>
+
+  <!-- Chat UI -->
+ <div id="chatUI" class="hidden flex flex-col w-full max-w-2xl mx-auto p-6 bg-white/20 dark:bg-gray-800/30 backdrop-blur-lg rounded-[2rem] shadow-2xl border border-pink-300/30 z-10 ring-1 ring-pink-200/40">
+
+
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-2xl font-bold">💬 DearChat</h2>
+      <button onclick="clearAllMessages()" class="text-sm text-red-500 hover:underline ml-4">🗑️ Clear All</button>
+      <div id="typingIndicator" class="hidden flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-2">
+  <div class="w-8 h-8 bg-pink-200 dark:bg-pink-500 rounded-full flex items-center justify-center shadow-inner animate-pulse">
+    💬
+  </div>
+  <div>
+    <span id="typingUser" class="font-semibold text-pink-500">K</span>
+    <span>is typing</span>
+    <div class="typing flex items-center ml-1">
+      <span class="typing-dot"></span>
+      <span class="typing-dot"></span>
+      <span class="typing-dot"></span>
+    </div>
+  </div>
+</div>
+
+    </div>
+    
+    <div id="chatBox" class="flex-1 overflow-y-auto space-y-3 mb-4 max-h-[60vh] scrollbar-thin p-4 rounded-xl"></div>
+
+    <div class="flex flex-col sm:flex-row items-center gap-3 mt-2">
+  <input id="msgInput"
+         type="text"
+         placeholder="Type your message..."
+         class="flex-1 px-4 py-3 rounded-xl border border-pink-200/50 bg-white/40 backdrop-blur-md text-white placeholder:text-white-600 focus:outline-none focus:ring-2 focus:ring-pink-400 shadow-sm transition duration-200 ease-in-out"
+         oninput="handleTyping()"/>
+
+  <div class="flex items-center gap-2 mt-2 sm:mt-0">
+    
+
+    <input type="file" id="imgInput" accept="image/*" class="hidden">
+    <button onclick="document.getElementById('imgInput').click()"
+            class="text-pink-500 hover:text-pink-600 text-2xl transition">📷</button>
+
+    <button onclick="toggleEmojiPad()"
+            class="text-pink-500 hover:text-pink-600 text-2xl transition">😊</button>
+
+    <button onclick="sendMessage()"
+            class="bg-gradient-to-br from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white px-5 py-2 rounded-xl shadow-md transition duration-300">❤️</button>
+  </div>
+</div>
+
+
+    <!-- Voice Recorder UI -->
+    <div id="voiceRecorder" class="hidden mt-2 p-3 bg-pink-100 dark:bg-gray-700 rounded-lg items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="relative">
+          <div id="pulseRing" class="pulse-ring hidden"></div>
+          <button id="recordBtn" class="bg-pink-500 text-white rounded-full w-10 h-10 flex items-center justify-center text-xl">
+            <span id="recordIcon">🎤</span>
+          </button>
+        </div>
+        <div id="waveform" class="waveform hidden">
+          <div class="waveform-bar"></div>
+          <div class="waveform-bar"></div>
+          <div class="waveform-bar"></div>
+          <div class="waveform-bar"></div>
+          <div class="waveform-bar"></div>
+          <div class="waveform-bar"></div>
+          <div class="waveform-bar"></div>
+          <div class="waveform-bar"></div>
+        </div>
+        <div id="timer" class="text-sm font-mono">00:00</div>
+      </div>
+      <div class="flex gap-2">
+        <button id="deleteRecording" class="text-red-500 text-xl hidden">🗑️</button>
+        <button id="sendRecording" class="text-green-500 text-xl hidden">✔️</button>
+      </div>
+    </div>
+
+    <!-- Emoji Pad -->
+    <div id="emojiPad" class="hidden mt-2 grid grid-cols-8 gap-2 text-xl bg-white dark:bg-gray-700 p-3 rounded-lg shadow-md">
+      <button class="emoji">😍</button>
+      <button class="emoji">😘</button>
+      <button class="emoji">🥰</button>
+      <button class="emoji">💖</button>
+      <button class="emoji">💋</button>
+      <button class="emoji">💕</button>
+      <button class="emoji">🌹</button>
+      <button class="emoji">❤️</button>
+      <button class="emoji">💌</button>
+      <button class="emoji">😇</button>
+      <button class="emoji">😻</button>
+      <button class="emoji">🫶</button>
+      <button class="emoji">😭</button>
+      <button class="emoji">😁</button>
+      <button class="emoji">🐻</button>
+      <button class="emoji">🎀</button>
+    </div>
+  </div>
+
+  <script>
+    // Firebase Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyCII6TEqIOM-sAof6HA3xBYUNV-ilCDH78",
+      authDomain: "lovechat-65abb.firebaseapp.com",
+      databaseURL: "https://lovechat-65abb-default-rtdb.firebaseio.com",
+      projectId: "lovechat-65abb",
+      storageBucket: "lovechat-65abb.appspot.com",
+      messagingSenderId: "614010820383",
+      appId: "1:614010820383:web:f7fb6f03101f63c713822a",
+      measurementId: "G-WXVN002Z9P"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let currentUser = "K";
+    let typingTimeout;
+    let isTyping = false;
+    let mediaRecorder;
+    let audioChunks = [];
+    let recordingStartTime;
+    let timerInterval;
+    let currentRecordingId = null;
+
+    // Auto-delete messages older than 48 hours
+    function autoDeleteOldMessages() {
+      const cutoffTime = Date.now() - 48 * 60 * 60 * 1000; // 48 hours ago
+      
+      db.ref("messages").once("value", snapshot => {
+        const updates = {};
+        snapshot.forEach(child => {
+          const msg = child.val();
+          if (msg.timestamp && msg.timestamp < cutoffTime) {
+            updates[child.key] = null;
+          }
+        });
+        
+        if (Object.keys(updates).length > 0) {
+          db.ref("messages").update(updates);
+        }
+      });
+    }
+
+    // Run auto-delete every hour
+    setInterval(autoDeleteOldMessages, 60 * 60 * 1000);
+    // Also run on startup
+    setTimeout(autoDeleteOldMessages, 1000);
+
+    function unlockChat() {
+      const pass = document.getElementById("passcode").value;
+      const selectedUser = document.getElementById("userSelect").value;
+      if (pass === "143kd") {
+        currentUser = selectedUser;
+        document.getElementById("unlockScreen").classList.add("hidden");
+        document.getElementById("chatUI").classList.remove("hidden");
+        loadMessages();
+        showAlert();
+        setupVoiceRecorder();
+        setupTypingListener(); // Initialize typing listener
+      } else {
+        alert("Wrong secret code!");
+      }
+    }
+
+    function sendMessage() {
+      const input = document.getElementById("msgInput");
+      const text = input.value.trim();
+      if (!text) return;
+      
+      const msg = {
+        user: currentUser,
+        type: "text",
+        content: text,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: Date.now()
+      };
+      
+      db.ref("messages").push(msg);
+      input.value = "";
+      
+      // Reset typing status
+      if (isTyping) {
+        isTyping = false;
+        db.ref("typing").child(currentUser).set(false);
+      }
+    }
+
+    document.getElementById("imgInput").addEventListener("change", function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const msg = {
+          user: currentUser,
+          type: "image",
+          content: event.target.result,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: Date.now()
+        };
+        db.ref("messages").push(msg);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    function loadMessages() {
+      const chatBox = document.getElementById("chatBox");
+      const sound = document.getElementById("notifSound");
+      
+      db.ref("messages").orderByChild("timestamp").on("value", snapshot => {
+        chatBox.innerHTML = "";
+        snapshot.forEach(child => {
+          const msg = child.val();
+          if (!msg) return;
+          
+          const div = document.createElement("div");
+          const isMe = msg.user === currentUser;
+          div.className = `flex ${isMe ? "justify-end" : "justify-start"} message-container`;
+          div.dataset.id = child.key;
+          
+          const bubble = document.createElement("div");
+          bubble.className = `rounded-2xl px-5 py-3 max-w-[75%] ${isMe ? "bg-gradient-to-tr from-pink-400 to-pink-600 text-white" : "bg-white/70 text-black dark:bg-gray-700/60 dark:text-white"} shadow-md backdrop-blur-md relative`;
+
+          
+          // Add delete button for user's own messages
+          if (isMe) {
+            const deleteBtn = document.createElement("button");
+            deleteBtn.className = "absolute -left-2 -top-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs";
+            deleteBtn.innerHTML = "×";
+            deleteBtn.onclick = () => deleteMessage(child.key, div);
+            bubble.appendChild(deleteBtn);
+          }
+
+          const userLabel = document.createElement("div");
+          userLabel.className = "text-xs font-bold mb-1";
+          userLabel.innerText = msg.user === "K" ? "K 💖" : "D 💖";
+          bubble.appendChild(userLabel);
+
+          if (msg.type === "text") {
+            const textEl = document.createElement("div");
+            textEl.innerText = msg.content;
+            bubble.appendChild(textEl);
+          } else if (msg.type === "image") {
+            const img = document.createElement("img");
+            img.src = msg.content;
+            img.className = "rounded-lg max-w-full mt-1";
+            bubble.appendChild(img);
+          } else if (msg.type === "audio") {
+            const audioContainer = document.createElement("div");
+            audioContainer.className = "flex items-center gap-2 mt-1";
+            
+            const audioEl = document.createElement("audio");
+            audioEl.src = msg.content;
+            audioEl.controls = true;
+            audioEl.className = "w-40";
+            
+            const playBtn = document.createElement("button");
+            playBtn.className = "bg-pink-500 text-white rounded-full w-8 h-8 flex items-center justify-center";
+            playBtn.innerHTML = "▶";
+            playBtn.onclick = () => audioEl.play();
+            
+            audioContainer.appendChild(playBtn);
+            audioContainer.appendChild(audioEl);
+            bubble.appendChild(audioContainer);
+          }
+
+          const time = document.createElement("div");
+          time.className = "text-xs mt-1 text-right";
+          time.innerText = msg.time;
+          bubble.appendChild(time);
+
+          div.appendChild(bubble);
+          chatBox.appendChild(div);
+        });
+        
+        sound.play();
+        scrollToBottom();
+      });
+    }
+    
+    function scrollToBottom() {
+      const chatBox = document.getElementById("chatBox");
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+    
+    function deleteMessage(messageId, element) {
+      element.classList.add("slide-out");
+      setTimeout(() => {
+        db.ref("messages").child(messageId).remove();
+      }, 300);
+    }
+
+    function toggleEmojiPad() {
+      const pad = document.getElementById("emojiPad");
+      pad.classList.toggle("hidden");
+    }
+
+    // Append emoji + hide pad
+    document.querySelectorAll('.emoji').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const input = document.getElementById("msgInput");
+        input.value += this.innerText;
+        document.getElementById("emojiPad").classList.add("hidden");
+        input.focus();
+      });
+    });
+
+    function showAlert() {
+      const alert = document.getElementById("alertBox");
+      alert.classList.remove("hidden");
+      setTimeout(() => alert.classList.add("hidden"), 3000);
+    }
+
+    // Typing indicator functions
+    function handleTyping() {
+      const input = document.getElementById("msgInput");
+      if (input.value.length > 0 && !isTyping) {
+        isTyping = true;
+        db.ref("typing").child(currentUser).set(true);
+      } else if (input.value.length === 0 && isTyping) {
+        isTyping = false;
+        db.ref("typing").child(currentUser).set(false);
+      }
+      
+      // Reset the typing status after 3 seconds of inactivity
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => {
+        if (isTyping) {
+          isTyping = false;
+          db.ref("typing").child(currentUser).set(false);
+        }
+      }, 3000);
+    }
+    
+    // Listen for typing status of the other user
+    function setupTypingListener() {
+      const otherUser = currentUser === "K" ? "D" : "K";
+      db.ref("typing").child(otherUser).on("value", snapshot => {
+        const typingIndicator = document.getElementById("typingIndicator");
+        const typingUser = document.getElementById("typingUser");
+        
+        if (snapshot.val()) {
+          typingIndicator.classList.remove("hidden");
+          typingUser.innerText = otherUser === "K" ? "K " : "D ";
+        } else {
+          typingIndicator.classList.add("hidden");
+        }
+      });
+    }
+
+    // Voice recorder functionality
+    function setupVoiceRecorder() {
+      const voiceBtn = document.getElementById("voiceBtn");
+      const voiceRecorder = document.getElementById("voiceRecorder");
+      const recordBtn = document.getElementById("recordBtn");
+      const pulseRing = document.getElementById("pulseRing");
+      const waveform = document.getElementById("waveform");
+      const timer = document.getElementById("timer");
+      const deleteRecordingBtn = document.getElementById("deleteRecording");
+      const sendRecordingBtn = document.getElementById("sendRecording");
+      
+      voiceBtn.addEventListener("click", () => {
+        voiceRecorder.classList.toggle("hidden");
+      });
+      
+      recordBtn.addEventListener("click", toggleRecording);
+      deleteRecordingBtn.addEventListener("click", cancelRecording);
+      sendRecordingBtn.addEventListener("click", sendRecording);
+      
+      async function toggleRecording() {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+          stopRecording();
+        } else {
+          await startRecording();
+        }
+      }
+      
+      async function startRecording() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream);
+          audioChunks = [];
+          
+          mediaRecorder.ondataavailable = event => {
+            audioChunks.push(event.data);
+          };
+          
+          mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            
+            // Show preview controls
+            recordBtn.innerHTML = "🔴";
+            pulseRing.classList.add("hidden");
+            waveform.classList.remove("hidden");
+            deleteRecordingBtn.classList.remove("hidden");
+            sendRecordingBtn.classList.remove("hidden");
+            
+            // Store the recording URL for sending
+            currentRecordingId = audioUrl;
+          };
+          
+          mediaRecorder.start();
+          recordingStartTime = Date.now();
+          startTimer();
+          
+          // Update UI
+          recordBtn.innerHTML = "⏹";
+          pulseRing.classList.remove("hidden");
+          waveform.classList.add("hidden");
+          deleteRecordingBtn.classList.add("hidden");
+          sendRecordingBtn.classList.add("hidden");
+        } catch (err) {
+          console.error("Error accessing microphone:", err);
+          alert("Could not access microphone. Please check permissions.");
+        }
+      }
+      
+      function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+          mediaRecorder.stop();
+          stopTimer();
+          
+          // Stop all tracks in the stream
+          mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        }
+      }
+      
+      function startTimer() {
+        clearInterval(timerInterval);
+        timerInterval = setInterval(updateTimer, 1000);
+        updateTimer();
+      }
+      
+      function stopTimer() {
+        clearInterval(timerInterval);
+      }
+      
+      function updateTimer() {
+        const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+        const seconds = (elapsed % 60).toString().padStart(2, '0');
+        timer.textContent = `${minutes}:${seconds}`;
+      }
+      
+      function cancelRecording() {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+          stopRecording();
+        }
+        
+        // Reset UI
+        resetRecordingUI();
+        currentRecordingId = null;
+      }
+      
+      function sendRecording() {
+        if (!currentRecordingId) return;
+        
+        const msg = {
+          user: currentUser,
+          type: "audio",
+          content: currentRecordingId,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: Date.now()
+        };
+        
+        db.ref("messages").push(msg);
+        resetRecordingUI();
+        voiceRecorder.classList.add("hidden");
+        currentRecordingId = null;
+      }
+      
+      function resetRecordingUI() {
+        recordBtn.innerHTML = "🎤";
+        pulseRing.classList.add("hidden");
+        waveform.classList.add("hidden");
+        deleteRecordingBtn.classList.add("hidden");
+        sendRecordingBtn.classList.add("hidden");
+        timer.textContent = "00:00";
+      }
+    }
+
+    // Falling hearts
+    const heartsContainer = document.getElementById('hearts');
+    setInterval(() => {
+      const heart = document.createElement('div');
+      heart.className = 'heart';
+      heart.style.left = Math.random() * 100 + 'vw';
+      heart.style.animationDuration = (2 + Math.random() * 4) + 's';
+      heartsContainer.appendChild(heart);
+      setTimeout(() => heart.remove(), 6000);
+    }, 300);
+    function clearAllMessages() {
+  db.ref("messages").remove()
+    .then(() => {
+      document.getElementById("chatBox").innerHTML = `
+        <div class='text-center text-pink-700 font-semibold'>
+          💬 All messages have been cleared!
+        </div>
+      `;
+    })
+    .catch(error => {
+      console.error("Error clearing messages:", error);
+    });
+
+  // Optional: clears typing status for both users
+  db.ref("typing").remove();
+}
+const typingUser = document.getElementById("typingUser");
+
+if (snapshot.val()) {
+  typingIndicator.classList.remove("hidden");
+  typingUser.innerText = otherUser === "K" ? "K" : "D";
+} else {
+  typingIndicator.classList.add("hidden");
+}
+
+
+
+  </script>
+</body>
+</html>
