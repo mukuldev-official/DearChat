@@ -107,6 +107,14 @@
     .slide-out {
       animation: slide-out 0.3s forwards;
     }
+    @keyframes fade-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 1s ease-out;
+}
+
   </style>
 </head>
 <body class="flex items-center justify-center min-h-screen bg-gradient-to-br from-pink-100 to-pink-300 dark:from-gray-800 dark:to-gray-900 text-gray-800 dark:text-white relative">
@@ -124,6 +132,16 @@
 
   <!-- Notification Sound -->
   <audio id="notifSound" src="assets/pop.mp3" preload="auto"></audio>
+  <div class="bg-[#1a2238] rounded-2xl p-6 shadow-xl">
+  <!-- 🔥 Add this block here -->
+  <div class="relative mb-6 text-center">
+    <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 animate-pulse transition-all duration-700">
+      Welcome to DearChat 💖
+    </h1>
+    <p class="mt-2 text-sm text-pink-200 animate-fade-in">
+      Express your feelings in real-time ✨
+    </p>
+  </div>
 
   <!-- Unlock Screen -->
   <div id="unlockScreen" class="flex flex-col items-center justify-center gap-4 z-10 p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
